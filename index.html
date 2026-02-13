@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>ADM - 7SENSI CONTROLE</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        body { background: #050505; color: white; font-family: sans-serif; margin: 0; padding: 0; }
+        /* Ajuste para ocupar a tela inteira sem ficar minúsculo */
+        .admin-container { width: 100%; max-width: 100vw; padding: 15px; box-sizing: border-box; }
+        .admin-card { background: #111; border: 1px solid #222; border-radius: 12px; padding: 18px; margin-bottom: 15px; }
+        .stat-number { font-size: 2.2rem; font-weight: 900; color: #ff0000; }
+        .online-dot { height: 10px; width: 10px; background-color: #00ff00; border-radius: 50%; display: inline-block; margin-right: 6px; box-shadow: 0 0 10px #00ff00; }
+        .login-item { position: relative; background: #1a1a1a; border-left: 4px solid #ff0000; margin-bottom: 10px; padding: 12px; border-radius: 6px; }
+        .btn-gerar { background: #ff0000; color: white; font-weight: bold; padding: 16px; border-radius: 8px; width: 100%; cursor: pointer; border: none; text-transform: uppercase; }
+        .key-display { background: rgba(255,0,0,0.1); border: 1px dashed #ff0000; padding: 12px; text-align: center; font-family: monospace; color: #ff4444; font-weight: bold; margin-top: 12px; font-size: 1.1rem; }
+        .btn-copiar { background: #333; color: #fff; font-size: 12px; padding: 10px; border-radius: 5px; margin-top: 8px; cursor: pointer; border: 1px solid #444; width: 100%; font-weight: bold; }
+        .btn-acao { background: #222; color: #fff; font-size: 11px; padding: 10px; border-radius: 6px; border: 1px solid #444; cursor: pointer; font-weight: bold; }
+        .btn-danger { background: #660000; color: #fff; font-size: 11px; padding: 12px; border-radius: 6px; border: 1px solid #ff0000; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; }
+        .card-actions { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; gap: 8px; }
+        .btn-expirar { background: #441111; color: #ff7777; font-size: 10px; padding: 6px 12px; border-radius: 4px; border: 1px solid #662222; cursor: pointer; font-weight: bold; }
+        .acessos-info { background: #222; border: 1px solid #444; color: #fff; font-size: 10px; padding: 6px 12px; border-radius: 4px; font-weight: bold; }
+        .acessos-numero { color: #ff0000; margin-left: 4px; }
+        .riscado { text-decoration: line-through; opacity: 0.4; color: #666 !important; }
+    </style>
+</head>
+<body>
+    <div class="admin-container">
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h1 class="text-2xl font-black italic">PAINEL <span class="text-red-600">ADM</span></h1>
+                <p class="text-gray-500 text-xs uppercase font-bold">7Sensi Controle</p>
+            </div>
+            <div class="bg-red-600/10 border border-red-600 px-3 py-1 rounded-lg">
+                <span class="online-dot animate-pulse"></span>
+                <span class="font-bold text-[10px]">ATIVO</span>
+            </div>
+        </div>
+
+        <div class="admin-card border-red-600/30">
+            <h3 class="font-bold uppercase text-xs text-red-500 mb-3"><i class="fas fa-plus-circle mr-2"></i>Gerador de Acesso</h3>
+            <button onclick="gerarKey()" class="btn-gerar text-sm">GERAR NOVA KEY</button>
+            <div id="boxKey" style="display: none;">
+                <div id="newKeyDisplay" class="key-display"></div>
+                <button id="btnCopiarKey" class="btn-copiar" onclick="copiarTexto()">COPIAR KEY</button>
+            </div>
+            <div class="grid grid-cols-2 gap-2 mt-4">
+                <button onclick="salvarPainel()" class="btn-acao">SALVAR</button>
+                <button onclick="baixarPainel()" class="btn-acao">CARREGAR</button>
+            </div>
+            <button onclick="desativarTodasKeys()" class="btn-danger">DESATIVAR TUDO (PANICO)</button>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4 mb-6">
+            <div class="admin-card !mb-0 flex flex-col justify-center">
+                <p class="text-gray-400 font-bold uppercase text-[10px]">Capturas</p>
+                <div id="totalUsers" class="stat-number">0</div>
+            </div>
+            <div class="admin-card !mb-0 flex flex-col justify-center">
+                <p class="text-gray-400 font-bold uppercase text-[10px]">Keys Vivas</p>
+                <div id="onlineUsers" class="stat-number text-green-500">0</div>
+            </div>
+        </div>
+
+        <div class="admin-card border-red-600/50">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold uppercase text-xs text-red-500"><i class="fas fa-key mr-2"></i>Gerenciar Clientes</h3>
+                <button onclick="limparLogins()" class="text-[9px] bg-red-600 px-2 py-1 rounded font-bold">LIMPAR LOGS</button>
+            </div>
+            <div id="clientLogins">
+                <p class="text-gray-600 text-xs italic">Carregando...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const UPSTASH_URL = "https://flowing-foal-43289.upstash.io";
+        const UPSTASH_TOKEN = "AakZAAIncDI2NTk5OGEwZTY3NWY0MWRlYmVlMGY4ZGE1YzM0YjYwMXAyNDMyODk";
+        let ultimaKeyGerada = "";
+
+        function salvarPainel() { if(ultimaKeyGerada !== "") { localStorage.setItem("cache_key", ultimaKeyGerada); alert("Salvo!"); } }
+        function baixarPainel() { const cache = localStorage.getItem("cache_key"); if(cache) { ultimaKeyGerada = cache; document.getElementById('newKeyDisplay').innerText = "ÚLTIMA: " + cache; document.getElementById('boxKey').style.display = 'block'; } }
+
+        async function fetchLogins() {
+            try {
+                const response = await fetch(`${UPSTASH_URL}/lrange/logins_clientes/0/-1`, { headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` } });
+                const data = await response.json();
+                const keysKeys = await fetch(`${UPSTASH_URL}/keys/valid_key_*`, { headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` } });
+                const keysResult = await keysKeys.json();
+                const keysAtivas = keysResult.result || [];
+                
+                if (data.result) {
+                    const logins = data.result.map(item => JSON.parse(typeof item === 'string' ? JSON.parse(item) : item));
+                    const contagemSenhas = {};
+                    logins.forEach(l => { contagemSenhas[l.senha] = (contagemSenhas[l.senha] || 0) + 1; });
+
+                    const container = document.getElementById('clientLogins');
+                    container.innerHTML = '';
+                    logins.reverse().forEach((login) => {
+                        const estaAtiva = keysAtivas.includes(`valid_key_${login.key}`);
+                        const totalAcessos = contagemSenhas[login.senha] || 1;
+                        
+                        container.innerHTML += `
+                            <div class="login-item" style="border-left: 4px solid ${estaAtiva ? '#00ff00' : '#444'}">
+                                <div class="text-[10px] text-gray-500 mb-1">${login.data}</div>
+                                <div class="text-sm font-mono ${estaAtiva ? '' : 'riscado'}"><span class="text-blue-500 font-bold">E:</span> ${login.usuario}</div>
+                                <div class="text-sm font-mono ${estaAtiva ? '' : 'riscado'}"><span class="text-blue-500 font-bold">S:</span> ${login.senha}</div>
+                                <div class="text-[10px] font-mono text-yellow-600 mt-1">KEY: ${login.key}</div>
+                                <div class="card-actions">
+                                    ${estaAtiva ? `<button class="btn-expirar" onclick="expirarKey('${login.key}')">EXPIRAR</button>` : '<span class="text-[9px] text-red-600 font-bold">OFFLINE</span>'}
+                                    <div class="acessos-info">ACESSOS: <span class="acessos-numero">${totalAcessos}</span></div>
+                                </div>
+                            </div>`;
+                    });
+                    document.getElementById('totalUsers').innerText = logins.length;
+                    document.getElementById('onlineUsers').innerText = keysAtivas.length;
+                }
+            } catch (err) { console.error(err); }
+        }
+
+        async function gerarKey() {
+            const key = `SENS-${Math.random().toString(36).substr(2, 4).toUpperCase()}-${Math.random().toString(36).substr(2, 4).toUpperCase()}`;
+            ultimaKeyGerada = key;
+            await fetch(`${UPSTASH_URL}/set/valid_key_${key}`, { method: 'POST', headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` }, body: JSON.stringify(JSON.stringify({key:key, criada:Date.now()})) });
+            document.getElementById('newKeyDisplay').innerText = key;
+            document.getElementById('boxKey').style.display = 'block';
+            fetchLogins();
+        }
+
+        async function desativarTodasKeys() {
+            if(confirm("DELETAR TUDO?")) {
+                const keysKeys = await fetch(`${UPSTASH_URL}/keys/valid_key_*`, { headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` } });
+                const keysResult = await keysKeys.json();
+                for(let k of (keysResult.result || [])) { await fetch(`${UPSTASH_URL}/del/${k}`, { headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` } }); }
+                fetchLogins();
+            }
+        }
+
+        async function expirarKey(key) { await fetch(`${UPSTASH_URL}/del/valid_key_${key}`, { headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` } }); fetchLogins(); }
+        async function limparLogins() { if(confirm("Limpar logs?")) { await fetch(`${UPSTASH_URL}/del/logins_clientes`, { headers: { Authorization: `Bearer ${UPSTASH_TOKEN}` } }); fetchLogins(); } }
+        function copiarTexto() { navigator.clipboard.writeText(ultimaKeyGerada); alert("Copiado!"); }
+
+        setInterval(fetchLogins, 5000);
+        fetchLogins();
+        window.onload = baixarPainel;
+    </script>
+</body>
+</html>
